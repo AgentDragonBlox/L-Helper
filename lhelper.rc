@@ -1,0 +1,2 @@
+// Exe icon (Explorer, Start menu shortcut, task). The manifest is embedded separately by build.rs.
+1 ICON "assets/lhelper.ico"

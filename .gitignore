@@ -1,0 +1,5 @@
+/target
+/dist
+/packaging/build
+/packaging/install.log
+*.pfx

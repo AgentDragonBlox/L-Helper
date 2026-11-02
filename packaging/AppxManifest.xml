@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sparse package for LHelper: gives the existing lhelper.exe (registered with -ExternalLocation) a package identity so
+  Windows accepts it as a Dynamic Lighting background controller (com.microsoft.windows.lighting app extension).
+  Nothing is installed from here except this manifest and its logos; the exe keeps running from its own folder.
+  Build and register with packaging\install.ps1.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 uap10 rescap">
+
+  <!-- Name and Publisher are the package identity (also in lhelper.exe.manifest); the display names are "L-Helper" -->
+  <Identity Name="LHelper" Publisher="CN=LHelper" Version="1.0.0.0" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>L-Helper</DisplayName>
+    <PublisherDisplayName>L-Helper</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
+  </Properties>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26300.0" />
+  </Dependencies>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
+    <rescap:Capability Name="allowElevation" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="LHelper" Executable="lhelper.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App">
+      <uap:VisualElements
+        AppListEntry="none"
+        DisplayName="L-Helper"
+        Description="Control tool for Lenovo LOQ, Legion and IdeaPad laptops"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.microsoft.windows.lighting" Id="LHelper" DisplayName="L-Helper" Description="24-zone keyboard lighting effects" PublicFolder="Public" />
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>
