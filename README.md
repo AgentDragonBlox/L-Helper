@@ -2,6 +2,8 @@
 
 A G-Helper-style control tool for **Lenovo LOQ, Legion and IdeaPad** laptops. It's a single native exe written in Rust, with no .NET runtime and no services.
 
+<p align="center"><img src="docs/screenshots/main.png" width="420" alt="L-Helper main window: performance modes, GPU modes, screen, keyboard and battery"></p>
+
 Features:
 - Performance modes and Custom mode, with fan curves and power limits
 - GPU modes, plus GPU overclock and undervolt on supported NVIDIA GPUs
@@ -12,6 +14,14 @@ Features:
 - Fn keys and on-screen popups
 - BIOS and driver update check
 - Lenovo software disabler
+
+## Screenshots
+
+| Fans + Power | Keyboard Lighting |
+|---|---|
+| <img src="docs/screenshots/fans.png" alt="Fan curve editor and CPU / GPU power limits"> | <img src="docs/screenshots/lighting.png" alt="24-zone keyboard lighting presets"> |
+| **Settings** | **Game overlay** (Ctrl+Shift+O) |
+| <img src="docs/screenshots/settings.png" width="360" alt="Settings: key locks, startup, Dynamic Lighting, overlay"> | <img src="docs/screenshots/overlay.png" alt="Game overlay with CPU, GPU, RAM and VRAM usage, temperatures and power"> |
 
 > Hardware controls have been tested on a LOQ 15AHP10 (83JG). Other models may behave differently. Please attach `C:\ProgramData\LHelper\log.txt` to bug reports.
 
