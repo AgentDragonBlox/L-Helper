@@ -112,3 +112,16 @@ pub fn unschedule() {
     let ok = schtasks(&["/Delete", "/TN", &task_name(), "/F"]);
     crate::log!("Startup removed: {ok}");
 }
+
+/// Every user's startup task (the MSI uninstall runs as SYSTEM)
+pub fn unschedule_all() {
+    let exe = PathBuf::from(std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into())).join("System32").join("schtasks.exe");
+    let Ok(out) = Command::new(exe).args(["/Query", "/FO", "CSV", "/NH"]).creation_flags(CREATE_NO_WINDOW).output() else { return };
+    let list = String::from_utf8_lossy(&out.stdout).to_string();
+    let mut names: Vec<&str> = list.lines().filter_map(|l| l.split(',').next()).map(|n| n.trim_matches('"')).filter(|n| n.starts_with("\\LHelper_")).collect();
+    names.dedup();
+    for name in names {
+        let ok = schtasks(&["/Delete", "/TN", name, "/F"]);
+        crate::log!("Startup task {name} removed: {ok}");
+    }
+}

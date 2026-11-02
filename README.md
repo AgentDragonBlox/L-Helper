@@ -15,22 +15,24 @@ Features:
 
 > Hardware controls have been tested on a LOQ 15AHP10 (83JG). Other models may behave differently. Please attach `C:\ProgramData\LHelper\log.txt` to bug reports.
 
-## Install (testers)
+## Install
 
-1. Download `L-Helper-<version>.zip` from [Releases](../../releases) and unzip the whole folder.
-2. Run `lhelper.exe` and accept the admin prompt. SmartScreen may warn about an unsigned exe. If so, click **More info → Run anyway**.
-3. Set up keyboard lighting:
-   1. In L-Helper, open **Settings → Dynamic Lighting → Register**, then click **Restart**.
-   2. In Windows Settings, open **Personalization → Dynamic Lighting → Background light control** and move L-Helper to the top.
+1. Download `L-Helper-<version>.msi` from [Releases](../../releases) and run it. SmartScreen may warn about an unsigned installer. If so, click **More info → Run anyway**.
+2. Leave **Launch L-Helper** ticked at the end, and accept L-Helper's admin prompt. On its first start, L-Helper registers with Dynamic Lighting and restarts itself once.
+3. In Windows Settings, open **Personalization → Dynamic Lighting → Background light control** and move L-Helper to the top.
 
-Registering does three things:
-- It copies the exe to `C:\Program Files\LHelper`.
+The installer does three things:
+- It puts L-Helper in `C:\Program Files\LHelper`.
 - It adds a Start menu shortcut.
-- It trusts the L-Helper signing certificate (`LHelper.cer`) for app packages on your PC.
+- It trusts the L-Helper signing certificate (`CN=LHelper`) for app packages on your PC.
 
-This is what lets Dynamic Lighting hand the keyboard to L-Helper in the background. To undo it, use **Settings → Dynamic Lighting → Remove**.
+The certificate is what lets Dynamic Lighting hand the keyboard to L-Helper in the background. To update, run the newer MSI. To uninstall, use **Settings → Apps → L-Helper → Uninstall**. That removes the program, the Dynamic Lighting registration, the certificate and the startup task.
 
-Settings and logs live in `C:\ProgramData\LHelper`. Only administrators can write to that folder.
+Settings and logs live in `C:\ProgramData\LHelper`. Only administrators can write to that folder, and uninstalling keeps it.
+
+**Portable alternative:** `L-Helper-<version>.zip` has the same exe without an installer.
+1. Unzip the whole folder and run `lhelper.exe`.
+2. Open **Settings → Dynamic Lighting → Register**, then click **Restart**.
 
 ## Build
 
@@ -42,9 +44,9 @@ cargo build --release
 
 The output is `target\release\lhelper.exe`. The manifest asks for admin rights, because Lenovo's WMI methods and EnergyDrv require them.
 
-Packaging scripts need the Windows SDK:
+Packaging scripts need the Windows SDK. The release script also needs the .NET SDK, because it gets WiX 5 through `.config\dotnet-tools.json`.
 - `packaging\install.ps1` installs on this PC and registers the Dynamic Lighting package, for development. Run it as administrator.
-- `packaging\release.ps1` builds `dist\L-Helper-<version>.zip` for a GitHub release. Bump `version` in `Cargo.toml` first.
+- `packaging\release.ps1` builds `dist\L-Helper-<version>.msi` and the portable `.zip` for a GitHub release. Bump `version` in `Cargo.toml` first. The installer source is `packaging\installer\LHelper.wxs`.
 - `packaging\uninstall.ps1` removes everything that `install.ps1` added. Run it as administrator.
 
 The package is signed with a self-signed `CN=LHelper` certificate. It's kept in your CurrentUser certificate store. Back it up, and never commit the `.pfx` (see `packaging\pack.ps1`).

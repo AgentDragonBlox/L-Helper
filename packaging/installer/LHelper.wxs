@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  L-Helper MSI (WiX 5). Built by packaging\release.ps1, which writes packaging\build\installer.wxi (Version, Exe,
+  Msix, Cer, Root), then: wix build LHelper.wxs -arch x64 -ext WixToolset.UI.wixext -o L-Helper-1.0.0.msi
+  (WiX 5 drops the value of a repeated -d or -ext, hence the include file and a single extension.)
+
+  Per machine, into %ProgramFiles%\LHelper (admin-only: the no-prompt startup task must not run a swappable exe).
+  As SYSTEM it trusts L-Helper's package certificate (lhelper.exe -msi-install) and on uninstall removes the
+  Dynamic Lighting package, the certificate and the startup tasks (lhelper.exe -msi-uninstall). The package itself
+  is registered per user by L-Helper on its first start (win/package.rs).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <?include ..\build\installer.wxi ?>
+  <!-- Never change the UpgradeCode: it's how a new MSI finds and replaces the installed one -->
+  <Package Name="L-Helper"
+           Manufacturer="L-Helper"
+           Version="$(Version)"
+           UpgradeCode="733AF42B-05B5-4025-9531-1864EEF0EEE2"
+           Scope="perMachine"
+           Language="1033">
+    <SummaryInformation Description="L-Helper $(Version): control tool for Lenovo LOQ, Legion and IdeaPad laptops" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of L-Helper is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="lhelper.ico" SourceFile="$(Root)\assets\lhelper.ico" />
+    <Property Id="ARPPRODUCTICON" Value="lhelper.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/AgentDragonBlox/L-Helper" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="LHelper" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="Files" Directory="INSTALLFOLDER">
+      <Component>
+        <File Id="lhelper.exe" Source="$(Exe)" KeyPath="yes" />
+      </Component>
+      <Component>
+        <File Id="LHelper.msix" Source="$(Msix)" KeyPath="yes" />
+      </Component>
+      <Component>
+        <File Id="LHelper.cer" Source="$(Cer)" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <!-- Own component with a registry key path, as Windows Installer wants for shortcuts (ICE43 / ICE57) -->
+      <Component Id="StartMenuShortcut">
+        <!-- Same taskbar ID as the window (main.rs AUMID), so the pinned and running icons are one -->
+        <Shortcut Id="StartMenu" Name="L-Helper" Description="L-Helper" Target="[#lhelper.exe]" WorkingDirectory="INSTALLFOLDER">
+          <ShortcutProperty Key="System.AppUserModel.ID" Value="LHelper.LHelper" />
+        </Shortcut>
+        <RegistryValue Root="HKCU" Key="Software\LHelper" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="L-Helper">
+      <ComponentGroupRef Id="Files" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <!-- A running copy holds lhelper.exe open; it runs elevated, so only SYSTEM can end it -->
+    <CustomAction Id="StopApp" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]taskkill.exe&quot; /F /IM lhelper.exe"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="TrustCertificate" FileRef="lhelper.exe" ExeCommand="-msi-install" Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="Cleanup" FileRef="lhelper.exe" ExeCommand="-msi-uninstall" Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="StopApp" Before="RemoveFiles" />
+      <!-- Full uninstall only, not the removal of the old version during an upgrade -->
+      <Custom Action="Cleanup" After="StopApp" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="TrustCertificate" After="InstallFiles" Condition="NOT REMOVE" />
+    </InstallExecuteSequence>
+
+    <!-- Welcome + licence page (with the certificate notice), progress, finish with "Launch L-Helper" -->
+    <WixVariable Id="WixUILicenseRtf" Value="$(Root)\packaging\installer\license.rtf" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch L-Helper" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <!-- Through Explorer: L-Helper asks for admin itself (UAC), and starts as the user, not as the installer -->
+    <CustomAction Id="LaunchApp" Directory="INSTALLFOLDER" ExeCommand="&quot;[WindowsFolder]explorer.exe&quot; &quot;[#lhelper.exe]&quot;"
+                  Impersonate="yes" Return="asyncNoWait" />
+    <UI>
+      <ui:WixUI Id="WixUI_Minimal" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApp"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+    </UI>
+  </Package>
+</Wix>

@@ -44,6 +44,11 @@ fn main() {
 
     log!("------------ LHelper (Rust) {} {}", env!("CARGO_PKG_VERSION"), args[1..].join(" "));
 
+    // Run by the MSI installer: do the one step and exit, no UI
+    if let Some(code) = win::package::installer_command(&args) {
+        std::process::exit(code);
+    }
+
     // Single instance: a second launch asks the first one to show itself and waits for it to confirm.
     // If the running copy doesn't answer (hung, or stuck shutting down inside a driver call), end it and start anyway,
     // so LHelper can never get locked out by a dead instance.
@@ -70,6 +75,11 @@ fn main() {
             win::terminate_other_instances();
         }
         std::mem::forget(mutex);
+    }
+
+    // First start after the MSI: register for Dynamic Lighting, then hand over to a copy with the package identity
+    if !screenshots && win::package::register_after_install() {
+        return;
     }
 
     // Hardware detection on a plain MTA thread (the UI thread belongs to winit / OLE)

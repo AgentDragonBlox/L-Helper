@@ -1,15 +1,15 @@
-//! Registers the sparse package that makes L-Helper a Dynamic Lighting background controller, from the release
-//! zip's LHelper.msix and LHelper.cer next to the exe. No Windows SDK or script needed on testers' PCs.
+//! Registers the sparse package that makes L-Helper a Dynamic Lighting background controller, from the
+//! LHelper.msix and LHelper.cer next to the exe. No Windows SDK or script needed on testers' PCs.
 //!
 //! The package is signed with L-Helper's own self-signed certificate, so registering means trusting that
-//! certificate for packages on this PC (LocalMachine\TrustedPeople). The user opts in from Settings; nothing
-//! here runs on its own.
+//! certificate for packages on this PC (LocalMachine\TrustedPeople). The user opts in: by running the MSI
+//! (packaging/installer, which trusts the certificate) or from Settings with the zip.
 
 use std::path::{Path, PathBuf};
 
 use windows::core::{Interface, HSTRING, PCWSTR};
 use windows::Foundation::Uri;
-use windows::Management::Deployment::{AddPackageOptions, PackageManager};
+use windows::Management::Deployment::{AddPackageOptions, PackageManager, RemovalOptions};
 
 use super::secure;
 
@@ -52,6 +52,7 @@ pub fn register() -> Result<(), String> {
         Err(e) => return Err(format!("Registration failed: {}", e.message())),
     }
     crate::log!("Registered {} -> {}", registered().unwrap_or_default(), dir.display());
+    crate::config::remove("dl_package_removed");
 
     if let Err(e) = shortcut(&exe) {
         crate::log!("Start menu shortcut: {e}");
@@ -69,16 +70,91 @@ pub fn unregister() -> Result<(), String> {
     if let Some((_, cer)) = bundle() {
         untrust_certificate(&cer);
     }
+    // Removed on purpose: don't register again at the next start after an MSI install
+    crate::config::set("dl_package_removed", 1);
     Ok(())
 }
 
 /// Start the Program Files copy (which runs with the package identity) once this process has exited
 pub fn restart_installed() {
+    if spawn_installed() {
+        crate::app::quit();
+    }
+}
+
+fn spawn_installed() -> bool {
     let exe = secure::install_dir().join("lhelper.exe");
     let pid = std::process::id().to_string();
     match std::process::Command::new(&exe).args(["-after", &pid]).spawn() {
-        Ok(_) => crate::app::quit(),
-        Err(e) => crate::log!("Couldn't start {}: {e}", exe.display()),
+        Ok(_) => true,
+        Err(e) => {
+            crate::log!("Couldn't start {}: {e}", exe.display());
+            false
+        }
+    }
+}
+
+/// First start after an MSI install: register the package for this user (packages are per user, and the
+/// installer runs as SYSTEM, having already trusted the certificate). True when a restart with the package
+/// identity was started and this process should exit.
+pub fn register_after_install() -> bool {
+    if crate::lighting::lamparray::package_name().is_some() || crate::config::is("dl_package_removed") {
+        return false;
+    }
+    let in_install_dir = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|d| d.to_string_lossy().to_lowercase()))
+        .is_some_and(|d| d == secure::install_dir().to_string_lossy().to_lowercase());
+    let Some((_, cer)) = bundle() else { return false };
+    if !in_install_dir || !is_trusted(&cer) || registered().is_some() {
+        return false;
+    }
+    crate::log!("Registering for Dynamic Lighting (installed by the MSI)");
+    match register() {
+        Ok(()) => spawn_installed(),
+        Err(e) => {
+            crate::log!("Dynamic Lighting registration failed: {e}");
+            false
+        }
+    }
+}
+
+/// Commands the MSI runs as SYSTEM (packaging/installer/LHelper.wxs); returns the exit code for msiexec
+pub fn installer_command(args: &[String]) -> Option<i32> {
+    if args.iter().any(|a| a == "-msi-install") {
+        let result = bundle().ok_or_else(|| "LHelper.cer missing".to_string()).and_then(|(_, cer)| trust_certificate(&cer));
+        return Some(match result {
+            Ok(()) => {
+                crate::log!("MSI: certificate trusted");
+                0
+            }
+            Err(e) => {
+                crate::log!("MSI: {e}");
+                1
+            }
+        });
+    }
+    if args.iter().any(|a| a == "-msi-uninstall") {
+        super::terminate_other_instances();
+        remove_for_all_users();
+        if let Some((_, cer)) = bundle() {
+            untrust_certificate(&cer);
+        }
+        super::startup::unschedule_all();
+        crate::log!("MSI: removed the package, certificate and startup tasks");
+        return Some(0);
+    }
+    None
+}
+
+/// Every user's registration of the package (uninstall runs as SYSTEM, not as any of them)
+fn remove_for_all_users() {
+    let Ok(pm) = PackageManager::new() else { return };
+    let Ok(found) = pm.FindPackagesByNamePublisher(&NAME.into(), &PUBLISHER.into()) else { return };
+    for package in found {
+        let Ok(name) = package.Id().and_then(|id| id.FullName()) else { continue };
+        let result = pm.RemovePackageWithOptionsAsync(&name, RemovalOptions::RemoveForAllUsers).and_then(|op| op.join());
+        crate::log!("MSI: removed {name}: {}", result.map(|_| "OK".to_string()).unwrap_or_else(|e| e.message()));
     }
 }
 
@@ -127,21 +203,38 @@ fn trust_certificate(cer: &Path) -> Result<(), String> {
     }
 }
 
-fn untrust_certificate(cer: &Path) {
+/// Runs `f` on the TrustedPeople copy of the certificate, if it's there
+fn with_trusted<T>(cer: &Path, f: impl FnOnce(*const windows::Win32::Security::Cryptography::CERT_CONTEXT) -> T) -> Option<T> {
     use windows::Win32::Security::Cryptography::*;
-    let Ok(der) = read_certificate(cer) else { return };
-    let Ok(store) = trusted_people() else { return };
+    let der = read_certificate(cer).ok()?;
+    let store = trusted_people().ok()?;
+    let mut result = None;
     unsafe {
         let ctx = CertCreateCertificateContext(X509_ASN_ENCODING, &der);
         if !ctx.is_null() {
             let found = CertFindCertificateInStore(store, X509_ASN_ENCODING, 0, CERT_FIND_EXISTING, Some(ctx as *const _), None);
             if !found.is_null() {
-                let _ = CertDeleteCertificateFromStore(found);
+                result = Some(f(found));
             }
             let _ = CertFreeCertificateContext(Some(ctx));
         }
         let _ = CertCloseStore(Some(store), 0);
     }
+    result
+}
+
+fn is_trusted(cer: &Path) -> bool {
+    with_trusted(cer, |found| unsafe {
+        let _ = windows::Win32::Security::Cryptography::CertFreeCertificateContext(Some(found));
+    })
+    .is_some()
+}
+
+fn untrust_certificate(cer: &Path) {
+    // Deleting frees the context
+    with_trusted(cer, |found| unsafe {
+        let _ = windows::Win32::Security::Cryptography::CertDeleteCertificateFromStore(found);
+    });
 }
 
 /// All users' Start menu shortcut, with the same taskbar ID as the running window so they group together
@@ -153,6 +246,10 @@ fn shortcut(exe: &Path) -> Result<(), String> {
 
     let programs = PathBuf::from(std::env::var("ProgramData").map_err(|e| e.to_string())?).join(r"Microsoft\Windows\Start Menu\Programs");
     let _ = std::fs::remove_file(programs.join("LHelper.lnk"));
+    // The MSI's own shortcut: leave it, the installer removes it on uninstall
+    if programs.join("L-Helper.lnk").exists() {
+        return Ok(());
+    }
     let wide = |s: &str| HSTRING::from(s);
     let e = |e: windows::core::Error| e.message();
     unsafe {
