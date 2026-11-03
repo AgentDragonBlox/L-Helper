@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name=L-Helper
+GenericName=Laptop Control
+Comment=Performance modes, keyboard lighting, battery and screen for Lenovo LOQ, Legion and IdeaPad laptops
+Exec=lhelper
+Icon=lhelper
+Terminal=false
+Categories=Settings;HardwareSettings;System;
+Keywords=lenovo;legion;loq;ideapad;performance;fan;power;rgb;keyboard;battery;
+StartupWMClass=lhelper
+SingleMainWindow=true
+Actions=next-lighting;
+
+[Desktop Action next-lighting]
+Name=Next lighting preset
+Exec=lhelper --next-lighting

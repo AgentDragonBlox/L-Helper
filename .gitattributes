@@ -1,0 +1,6 @@
+# Shell scripts must keep LF endings, even when checked out on Windows
+*.sh text eol=lf
+linux/packaging/debian/* text eol=lf
+*.rules text eol=lf
+*.desktop text eol=lf
+*.policy text eol=lf

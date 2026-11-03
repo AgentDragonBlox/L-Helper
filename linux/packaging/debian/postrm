@@ -1,0 +1,8 @@
+#!/bin/sh
+# Drop the keyboard access the udev rule gave
+set -e
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    udevadm control --reload-rules 2>/dev/null || true
+    udevadm trigger --subsystem-match=hidraw --action=change 2>/dev/null || true
+fi
+exit 0

@@ -44,6 +44,17 @@ Settings and logs live in `C:\ProgramData\LHelper`. Only administrators can writ
 1. Unzip the whole folder and run `lhelper.exe`.
 2. Open **Settings → Dynamic Lighting → Register**, then click **Restart**.
 
+## Linux (preview)
+
+A first Linux build for Ubuntu 26.04 is in [linux/](linux/README.md). It covers:
+- performance modes and power limits
+- 24-zone keyboard lighting
+- battery modes, Fn lock and always-on USB
+- refresh rate
+- a tray icon
+
+It's packaged as a `.deb`, and it hasn't been tested on hardware yet. Build and test steps are in [linux/README.md](linux/README.md).
+
 ## Build
 
 Requires Rust (MSVC toolchain) on Windows.
@@ -85,6 +96,7 @@ src/
   tray.rs            tray icon on its own message thread
   ui/                egui windows and G-Helper style widgets
 packaging/           sparse package manifest, logos, install / release scripts
+linux/               Linux build (own crate; shares lighting, presets and widgets from src/ with #[path])
 ```
 
 ## Credits

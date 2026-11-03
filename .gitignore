@@ -3,3 +3,4 @@
 /packaging/build
 /packaging/install.log
 *.pfx
+/linux/target

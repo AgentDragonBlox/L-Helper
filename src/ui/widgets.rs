@@ -3,6 +3,7 @@
 
 use egui::{Color32, CornerRadius, Pos2, Rect, Response, RichText, Sense, Stroke, StrokeKind, Ui, Vec2};
 
+#[cfg(windows)]
 use crate::lenovo::fans::{self, FanTableData};
 use crate::lighting::zone::Color as ZoneColor;
 
@@ -65,7 +66,38 @@ impl Theme {
         }
     }
 
+    /// Linux build: the first installed UI font (regular + bold), else egui's built-in one. Icons are emoji from egui's
+    /// built-in emoji fonts (see the ICON_ constants), so there's no icon font to load.
+    #[cfg(not(windows))]
+    pub fn load_fonts(ctx: &egui::Context) {
+        const FAMILIES: [(&str, &str); 4] = [
+            ("/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf", "/usr/share/fonts/truetype/ubuntu/Ubuntu-M.ttf"),
+            ("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", "/usr/share/fonts/truetype/noto/NotoSans-SemiBold.ttf"),
+            ("/usr/share/fonts/noto/NotoSans-Regular.ttf", "/usr/share/fonts/noto/NotoSans-SemiBold.ttf"),
+            ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ];
+        let mut fonts = egui::FontDefinitions::default();
+        let found = FAMILIES.iter().find_map(|(regular, bold)| Some((std::fs::read(regular).ok()?, std::fs::read(bold).ok())));
+        if let Some((regular, bold)) = found {
+            fonts.font_data.insert("ui".into(), std::sync::Arc::new(egui::FontData::from_owned(regular)));
+            fonts.families.entry(egui::FontFamily::Proportional).or_default().insert(0, "ui".into());
+            if let Some(bold) = bold {
+                fonts.font_data.insert("ui_bold".into(), std::sync::Arc::new(egui::FontData::from_owned(bold)));
+            }
+        }
+        let proportional = fonts.families.get(&egui::FontFamily::Proportional).cloned().unwrap_or_default();
+        let mut bold = Vec::new();
+        if fonts.font_data.contains_key("ui_bold") {
+            bold.push("ui_bold".to_string());
+        }
+        bold.extend(proportional.iter().cloned());
+        fonts.families.insert(egui::FontFamily::Name("bold".into()), bold);
+        fonts.families.insert(egui::FontFamily::Name("icons".into()), proportional);
+        ctx.set_fonts(fonts);
+    }
+
     /// Segoe UI from the Windows fonts folder (regular + semibold as "bold"), like the C# version
+    #[cfg(windows)]
     pub fn load_fonts(ctx: &egui::Context) {
         let dir = std::path::PathBuf::from(std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".into())).join("Fonts");
         let mut fonts = egui::FontDefinitions::default();
@@ -140,23 +172,48 @@ pub fn icons(size: f32) -> egui::FontId {
 }
 
 // Segoe Fluent Icons glyphs
-pub const ICON_SETTINGS: &str = "\u{E713}";
-pub const ICON_SPEED: &str = "\u{EC4A}";
-pub const ICON_GAUGE: &str = "\u{EC48}";
-pub const ICON_CHIP: &str = "\u{E950}";
-pub const ICON_SCREEN: &str = "\u{E7F4}";
-pub const ICON_KEYBOARD: &str = "\u{E765}";
-pub const ICON_BATTERY: &str = "\u{EBA7}";
-pub const ICON_LEAF: &str = "\u{E8BE}";
-pub const ICON_POWER: &str = "\u{E7E8}";
-pub const ICON_BOLT: &str = "\u{E945}";
-pub const ICON_SLIDERS: &str = "\u{E9E9}";
-pub const ICON_THERMO: &str = "\u{E9CA}";
-pub const ICON_LAPTOP: &str = "\u{E7F8}";
-pub const ICON_SPARKLE: &str = "\u{F4A5}";
-pub const ICON_SYNC: &str = "\u{E895}";
-pub const ICON_MOON: &str = "\u{E708}";
-pub const ICON_BULB: &str = "\u{EA80}";
+#[cfg(windows)]
+mod glyphs {
+    pub const ICON_SETTINGS: &str = "\u{E713}";
+    pub const ICON_SPEED: &str = "\u{EC4A}";
+    pub const ICON_GAUGE: &str = "\u{EC48}";
+    pub const ICON_CHIP: &str = "\u{E950}";
+    pub const ICON_SCREEN: &str = "\u{E7F4}";
+    pub const ICON_KEYBOARD: &str = "\u{E765}";
+    pub const ICON_BATTERY: &str = "\u{EBA7}";
+    pub const ICON_LEAF: &str = "\u{E8BE}";
+    pub const ICON_POWER: &str = "\u{E7E8}";
+    pub const ICON_BOLT: &str = "\u{E945}";
+    pub const ICON_SLIDERS: &str = "\u{E9E9}";
+    pub const ICON_THERMO: &str = "\u{E9CA}";
+    pub const ICON_LAPTOP: &str = "\u{E7F8}";
+    pub const ICON_SPARKLE: &str = "\u{F4A5}";
+    pub const ICON_SYNC: &str = "\u{E895}";
+    pub const ICON_MOON: &str = "\u{E708}";
+    pub const ICON_BULB: &str = "\u{EA80}";
+}
+// Linux build: Segoe Fluent Icons can't be redistributed; these are in egui's built-in emoji fonts
+#[cfg(not(windows))]
+mod glyphs {
+    pub const ICON_SETTINGS: &str = "⚙";
+    pub const ICON_SPEED: &str = "🚀";
+    pub const ICON_GAUGE: &str = "🔥";
+    pub const ICON_CHIP: &str = "🎮";
+    pub const ICON_SCREEN: &str = "🖥";
+    pub const ICON_KEYBOARD: &str = "⌨";
+    pub const ICON_BATTERY: &str = "🔋";
+    pub const ICON_LEAF: &str = "🍃";
+    pub const ICON_POWER: &str = "⚖";
+    pub const ICON_BOLT: &str = "⚡";
+    pub const ICON_SLIDERS: &str = "🎚";
+    pub const ICON_THERMO: &str = "🌡";
+    pub const ICON_LAPTOP: &str = "💻";
+    pub const ICON_SPARKLE: &str = "✨";
+    pub const ICON_SYNC: &str = "🔄";
+    pub const ICON_MOON: &str = "🌙";
+    pub const ICON_BULB: &str = "💡";
+}
+pub use glyphs::*;
 
 fn hover_fill(theme: &Theme, base: Color32, response: &Response) -> Color32 {
     let toward = if theme.dark { Color32::WHITE } else { Color32::BLACK };
@@ -434,6 +491,7 @@ pub fn keyboard_visualizer(ui: &mut Ui, colors: &[ZoneColor], size: Vec2, backgr
 }
 
 /// Draggable 10-point fan curve. Y = level 0-10 (labelled with the first fan's RPM), X = temperature points.
+#[cfg(windows)]
 pub fn fan_curve(ui: &mut Ui, theme: &Theme, table: &mut [i32; 10], data: &[FanTableData], enabled: bool, drag: &mut Option<usize>) -> bool {
     let size = ui.available_size();
     let (rect, response) = ui.allocate_exact_size(size, Sense::click_and_drag());

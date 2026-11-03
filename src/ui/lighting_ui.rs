@@ -36,6 +36,7 @@ fn percent(v: f32, min: f32, max: f32) -> i32 {
 
 pub struct LightingWindow {
     open: bool,
+    #[cfg_attr(not(windows), allow(dead_code))]
     recording_hotkey: bool,
     /// "Type here to test" box, so typing effects can be tried without leaving the window
     test: String,
@@ -141,6 +142,7 @@ impl LightingWindow {
         {
             app::job(move || if software { lighting::start() } else { lighting::stop(true) });
         }
+        #[cfg(windows)]
         if software && !lighting::dynamic_lighting_enabled() {
             ui.add_space(4.0);
             egui::Frame::new().fill(CARD).stroke(Stroke::new(1.0, Color32::from_rgb(120, 90, 20))).inner_margin(10).show(ui, |ui| {
@@ -167,7 +169,12 @@ impl LightingWindow {
             lighting::set_cycle_list(&cycle);
         }
 
+        // Linux build: Wayland gives apps no global hotkeys; desktops bind a shortcut to `lhelper --next-lighting`
+        #[cfg(not(windows))]
+        ui.label(RichText::new("Cycle from a keyboard shortcut: bind `lhelper --next-lighting` in your desktop's keyboard settings").font(mono(11.0)).color(MUTED));
+        #[cfg(windows)]
         ui.add_space(6.0);
+        #[cfg(windows)]
         ui.horizontal(|ui| {
             ui.label(caption("CYCLE HOTKEY"));
             let text = if self.recording_hotkey { "PRESS KEYS…".to_string() } else { config::get_string("rgb_hotkey").unwrap_or_else(|| "NONE".into()).to_uppercase() };
@@ -178,6 +185,7 @@ impl LightingWindow {
                 self.capture_hotkey(ui);
             }
         });
+        #[cfg(windows)]
         ui.label(RichText::new("e.g. Ctrl+Alt+L · Backspace clears").font(mono(11.0)).color(MUTED));
 
         ui.add_space(14.0);
@@ -264,6 +272,7 @@ impl LightingWindow {
         });
     }
 
+    #[cfg(windows)]
     fn capture_hotkey(&mut self, ui: &egui::Ui) {
         let events = ui.ctx().input(|i| i.events.clone());
         for e in events {

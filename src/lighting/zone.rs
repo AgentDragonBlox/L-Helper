@@ -1,9 +1,14 @@
 // 24-zone keyboard driver, adapted from LOQ-24-zone-RGB-controller (rust-backend/src/led_driver.rs)
 // Copyright (c) 2026 Dhruv Goel, MIT License. See THIRD_PARTY_NOTICES.md
 
+#[cfg(windows)]
 use hidapi::{HidApi, HidDevice};
+// Linux build (linux/): the same reports over /dev/hidraw
+#[cfg(not(windows))]
+use super::hidraw::HidDevice;
 
 pub const NUM_ZONES: usize = 24;
+#[cfg(windows)]
 const VID: u16 = 0x048D;
 /// hidapi pads / truncates to the device's feature report size (51 bytes on LOQ 15AHP10)
 const PACKET_SIZE: usize = 65;
@@ -86,6 +91,7 @@ pub struct ZoneKeyboard {
 // Dynamic Lighting controller, frames go through Windows' LampArray API (lamparray.rs) instead of the vendor reports.
 
 /// Interface 1 of the ITE controller (VID 048D). Any PID: the LOQ is C693, the Legion Pro 5 gen 10 uses another.
+#[cfg(windows)]
 fn find(api: &HidApi) -> Option<HidDevice> {
     for info in api.device_list() {
         if info.vendor_id() == VID && info.interface_number() == 1 {
@@ -98,10 +104,26 @@ fn find(api: &HidApi) -> Option<HidDevice> {
     None
 }
 
+#[cfg(windows)]
+fn open() -> Option<HidDevice> {
+    HidApi::new().ok().and_then(|api| find(&api))
+}
+
+#[cfg(not(windows))]
+fn open() -> Option<HidDevice> {
+    super::hidraw::open_keyboard()
+}
+
+#[cfg(windows)]
 pub fn is_present() -> bool {
     HidApi::new()
         .map(|api| api.device_list().any(|i| i.vendor_id() == VID && i.interface_number() == 1 && crate::lenovo::hid::feature_length(&i.path().to_string_lossy()).unwrap_or(0) >= 51))
         .unwrap_or(false)
+}
+
+#[cfg(not(windows))]
+pub fn is_present() -> bool {
+    super::hidraw::keyboard_present()
 }
 
 impl ZoneKeyboard {
@@ -110,7 +132,7 @@ impl ZoneKeyboard {
     }
 
     pub fn connect(&mut self) -> bool {
-        self.device = HidApi::new().ok().and_then(|api| find(&api));
+        self.device = open();
         self.device.is_some()
     }
 

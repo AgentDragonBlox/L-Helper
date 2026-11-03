@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!--
+  L-Helper's hardware writes: pkexec /usr/libexec/lhelper/lhelper-helper. The signed-in user at the laptop may run
+  it without a password, as with GNOME's power mode menu; anyone else (SSH, other sessions) needs an admin
+  password. The helper only accepts values the kernel drivers advertise (see src/bin/lhelper-helper.rs).
+-->
+<policyconfig>
+  <vendor>L-Helper</vendor>
+  <vendor_url>https://github.com/AgentDragonBlox/L-Helper</vendor_url>
+  <icon_name>lhelper</icon_name>
+  <action id="io.github.agentdragonblox.lhelper.control">
+    <description>Change laptop hardware settings</description>
+    <message>L-Helper wants to change a hardware setting (performance mode, power limits, battery or keyboard)</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/lhelper/lhelper-helper</annotate>
+  </action>
+</policyconfig>

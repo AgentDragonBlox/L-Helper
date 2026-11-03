@@ -33,6 +33,7 @@ pub fn rgba(kind: Logo, size: u32) -> Vec<u8> {
 }
 
 /// Taskbar / tray theme ("Choose your default Windows mode"), which can differ from the apps theme
+#[cfg(windows)]
 pub fn taskbar_is_light() -> bool {
     winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER)
         .open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
@@ -42,11 +43,13 @@ pub fn taskbar_is_light() -> bool {
 }
 
 /// Monochrome logo that reads on the current taskbar: black on light, white on dark
+#[cfg(windows)]
 pub fn for_taskbar() -> Logo {
     if taskbar_is_light() { Logo::Black } else { Logo::White }
 }
 
 /// Windows icon handle from the logo (32-bit color with alpha); the caller keeps it for the window's lifetime
+#[cfg(windows)]
 pub fn hicon(kind: Logo, size: u32) -> Option<windows::Win32::UI::WindowsAndMessaging::HICON> {
     use windows::Win32::Graphics::Gdi::*;
     use windows::Win32::UI::WindowsAndMessaging::{CreateIconIndirect, ICONINFO};
@@ -81,6 +84,7 @@ pub fn hicon(kind: Logo, size: u32) -> Option<windows::Win32::UI::WindowsAndMess
 /// The main window's icons: the taskbar (big icon) gets the black / white logo for the taskbar theme, the title
 /// bar (small icon) the blue one. Posted, so any thread can call it. The few icons replaced on theme
 /// changes are left to the process.
+#[cfg(windows)]
 pub fn apply_window_icons(hwnd: windows::Win32::Foundation::HWND) {
     use windows::Win32::Foundation::{LPARAM, WPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, ICON_BIG, ICON_SMALL, WM_SETICON};

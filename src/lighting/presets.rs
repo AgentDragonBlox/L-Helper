@@ -22,7 +22,7 @@ pub struct Preset {
     pub id: &'static str,
     pub name: &'static str,
     pub description: &'static str,
-    #[allow(dead_code)]
+    #[cfg_attr(windows, allow(dead_code))]
     pub group: &'static str,
     pub params: Vec<Param>,
 }
@@ -44,7 +44,7 @@ fn p(id: &'static str, name: &'static str, description: &'static str, group: &'s
 }
 
 pub fn all() -> Vec<Preset> {
-    vec![
+    let all = vec![
         p("staticColor", "Static Color", "One solid color", "Static", vec![color("color", "Color", 255, 255, 200)]),
         p("breathing", "Color Breath", "Fade in → fade out", "Static", vec![speed(0.1, 5.0, 1.0), color("color", "Color", 255, 0, 0)]),
         p("pulse", "Pulse Center", "Pulsing effect from the center", "Static", vec![speed(0.1, 5.0, 1.0), color("color", "Color", 255, 0, 0)]),
@@ -87,7 +87,11 @@ pub fn all() -> Vec<Preset> {
         ]),
         p("thermalStatus", "CPU / Memory / GPU usage", "Left = CPU, middle = memory, right = GPU", "System", vec![]),
         p("off", "Off", "All lighting off", "System", vec![]),
-    ]
+    ];
+    // Linux build: no screen capture, audio loopback or global key hook for the reactive presets yet
+    #[cfg(not(windows))]
+    let all = all.into_iter().filter(|p| p.group != "Reactive").collect();
+    all
 }
 
 pub fn find(id: &str) -> Option<Preset> {
