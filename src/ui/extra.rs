@@ -226,7 +226,7 @@ impl ExtraWindow {
         } else if package::bundle().is_some() {
             small(ui, "Lets Windows Dynamic Lighting hand the keyboard to L-Helper in the background. Installs L-Helper to Program Files and trusts its signing certificate for app packages on this PC.", t.text2);
         } else {
-            small(ui, "Not registered. Unzip the whole release (LHelper.msix and LHelper.cer next to lhelper.exe) to register from here.", t.text2);
+            small(ui, "Not registered. This build has no Dynamic Lighting package: use a release build of L-Helper to register from here.", t.text2);
         }
         if let Some(Some(Err(e))) = &job {
             let (r, g, b) = app::COLOR_PERFORMANCE;
@@ -391,6 +391,15 @@ impl ExtraWindow {
             let mut to_tray = config::is_not_false("minimize_to_tray");
             if toggle_row(ui, t, "Close to tray", "Off: closing the window exits L-Helper", &mut to_tray).changed() {
                 config::set("minimize_to_tray", to_tray as i64);
+            }
+            divider(ui, t);
+            let mut classic = false;
+            if toggle_row(ui, t, "Classic Windows interface", "Tabs, group boxes and system controls instead of this window. Restarts L-Helper", &mut classic).changed() && classic {
+                config::set_string("ui_style", "native");
+                if let Ok(exe) = std::env::current_exe() {
+                    let _ = std::process::Command::new(exe).args(["-after", &std::process::id().to_string()]).spawn();
+                    app::quit();
+                }
             }
         });
 

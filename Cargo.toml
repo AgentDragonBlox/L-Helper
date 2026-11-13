@@ -6,6 +6,10 @@ description = "Lightweight control tool for Lenovo LOQ, Legion and IdeaPad lapto
 license = "GPL-3.0-or-later"
 build = "build.rs"
 
+[features]
+# Separate names (src/identity.rs) for a copy that installs next to the regular one (release.ps1 -Test)
+test-identity = []
+
 [dependencies]
 eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts"] }
 egui = "0.37"
@@ -67,6 +71,7 @@ features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",
+    "Win32_UI_Controls",
     "Win32_UI_HiDpi",
     "Win32_Storage_Xps",
     "Win32_Media_Audio",

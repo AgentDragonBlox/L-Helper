@@ -10,7 +10,7 @@ static PENDING: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// %ProgramData%\LHelper: settings and log, writable by administrators only
 pub fn app_dir() -> PathBuf {
-    std::env::var_os("ProgramData").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("C:\\ProgramData")).join("LHelper")
+    std::env::var_os("ProgramData").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("C:\\ProgramData")).join(crate::identity::FOLDER)
 }
 
 /// Creates the data folder with its admin-only ACL, moving settings and log over from %AppData%\LHelper
@@ -20,7 +20,7 @@ pub fn init_data_dir() {
     let fresh = !dir.exists();
     let _ = std::fs::create_dir_all(&dir);
     if fresh {
-        if let Some(old) = std::env::var_os("APPDATA").map(|a| PathBuf::from(a).join("LHelper")) {
+        if let Some(old) = std::env::var_os("APPDATA").map(|a| PathBuf::from(a).join(crate::identity::FOLDER)) {
             for name in ["config.json", "log.txt"] {
                 let _ = std::fs::copy(old.join(name), dir.join(name));
             }

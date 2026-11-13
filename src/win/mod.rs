@@ -186,7 +186,7 @@ pub fn terminate_other_instances() {
         while ok {
             let len = entry.szExeFile.iter().position(|c| *c == 0).unwrap_or(entry.szExeFile.len());
             let name = String::from_utf16_lossy(&entry.szExeFile[..len]).to_lowercase();
-            if name == "lhelper.exe" && entry.th32ProcessID != me {
+            if name == crate::identity::EXE && entry.th32ProcessID != me {
                 if let Ok(h) = OpenProcess(PROCESS_TERMINATE | PROCESS_SYNCHRONIZE, false, entry.th32ProcessID) {
                     let _ = TerminateProcess(h, 1);
                     let _ = WaitForSingleObject(h, 2000);
@@ -202,6 +202,19 @@ pub fn terminate_other_instances() {
 
 pub fn is_visible(hwnd: HWND) -> bool {
     unsafe { IsWindowVisible(hwnd).as_bool() }
+}
+
+pub fn is_minimized(hwnd: HWND) -> bool {
+    unsafe { IsIconic(hwnd).as_bool() }
+}
+
+/// Hands the working set back to Windows while the window is hidden. Most of it is the OpenGL driver's (an empty
+/// egui window is ~80 MB on AMD graphics), which isn't needed until the window shows again; pages come back on use.
+pub fn trim_memory() {
+    use windows::Win32::System::Threading::{GetCurrentProcess, SetProcessWorkingSetSize};
+    unsafe {
+        let _ = SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX);
+    }
 }
 
 /// A Windows program by its full path (System32 / Windows folder), never through PATH
@@ -246,7 +259,7 @@ pub fn set_window_app_id(hwnd: HWND) {
             // Relaunch properties first: the taskbar reads them when the ID changes
             set_string_property(&store, &PKEY_AppUserModel_RelaunchCommand, &format!("\"{exe}\""))?;
             set_string_property(&store, &PKEY_AppUserModel_RelaunchIconResource, &format!("{exe},-1"))?;
-            set_string_property(&store, &PKEY_AppUserModel_RelaunchDisplayNameResource, "L-Helper")?;
+            set_string_property(&store, &PKEY_AppUserModel_RelaunchDisplayNameResource, crate::identity::DISPLAY)?;
             set_string_property(&store, &PKEY_AppUserModel_ID, crate::AUMID)
         })
     };
@@ -267,7 +280,7 @@ pub fn open_url(url: &str) {
 
 pub fn message_box(text: &str, yes_no: bool) -> bool {
     let w: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
-    let title: Vec<u16> = "L-Helper\0".encode_utf16().collect();
+    let title: Vec<u16> = crate::identity::DISPLAY.encode_utf16().chain(std::iter::once(0)).collect();
     let style = if yes_no { MB_YESNO | MB_ICONQUESTION } else { MB_OK | MB_ICONWARNING };
     unsafe { MessageBoxW(None, windows::core::PCWSTR(w.as_ptr()), windows::core::PCWSTR(title.as_ptr()), style | MB_TOPMOST) == IDYES }
 }

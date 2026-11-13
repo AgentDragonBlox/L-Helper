@@ -75,6 +75,7 @@ pub fn repaint() {
     if let Some(c) = CTX.get() {
         c.request_repaint();
     }
+    crate::native::poke();
 }
 
 pub fn ctx() -> Option<&'static egui::Context> {
@@ -451,8 +452,24 @@ pub fn start_background() {
         .spawn(|| {
             let mut plugged = sensors::plugged_in();
             let mut last = Instant::now();
+            // In the tray or minimized since / memory last given back
+            let mut hidden_since: Option<Instant> = None;
+            let mut trimmed: Option<Instant> = None;
             loop {
                 let visible = crate::win::is_visible(hwnd());
+                let shown = (visible && !crate::win::is_minimized(hwnd())) || crate::win::overlay::visible();
+                sensors::set_detailed(shown);
+                if shown {
+                    hidden_since = None;
+                    trimmed = None;
+                } else {
+                    // Once the window has been away a few seconds, then every minute (background work touches some again)
+                    let since = *hidden_since.get_or_insert_with(Instant::now);
+                    if since.elapsed() > Duration::from_secs(3) && trimmed.is_none_or(|t| t.elapsed() > Duration::from_secs(60)) {
+                        crate::win::trim_memory();
+                        trimmed = Some(Instant::now());
+                    }
+                }
                 std::thread::sleep(Duration::from_secs(if visible || crate::win::overlay::visible() { 1 } else { 5 }));
                 let gap = last.elapsed();
                 last = Instant::now();

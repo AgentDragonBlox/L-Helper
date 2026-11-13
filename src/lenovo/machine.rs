@@ -194,6 +194,14 @@ pub fn detect(simulate_ideapad: bool) -> &'static Machine {
     m.generation = detect_generation(&m.model);
 
     m.has_gamezone = gamezone::exists() && !simulate_ideapad;
+    // Some IdeaPads carry a GameZone class whose mode methods are missing (Pro 5 14IMH9: 0x80041002) or return
+    // malformed data (Slim 5 83HY: 0x8004100F). With Lenovo's ITS service there, use it, like Vantage does.
+    if m.has_gamezone && is_its_model(&m.model) && its::is_available() {
+        if let Err(e) = gamezone::smart_fan_mode() {
+            crate::log!("GameZone can't report the mode ({e}): using ITS modes instead");
+            m.has_gamezone = false;
+        }
+    }
     if m.has_gamezone {
         m.platform = Platform::Gaming;
         m.smart_fan_version = gamezone::smart_fan_version().unwrap_or(-1);

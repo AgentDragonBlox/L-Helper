@@ -6,7 +6,14 @@
 # certificate means every tester has to register again. Back it up with
 #   Export-PfxCertificate -Cert (Get-ChildItem Cert:\CurrentUser\My | ? Subject -eq "CN=LHelper") -FilePath LHelper.pfx -Password (Read-Host -AsSecureString)
 # and never commit or upload the .pfx.
+#
+# -Test: the test build's package (src/identity.rs): name LHelperTest, CN=LHelperTest certificate, lhelper-test.exe,
+# into packaging\build-test, so it registers next to a regular L-Helper.
+param([switch]$Test)
 $ErrorActionPreference = "Stop"
+$package = if ($Test) { "LHelperTest" } else { "LHelper" }
+$display = if ($Test) { "L-Helper Test" } else { "L-Helper" }
+$exeName = if ($Test) { "lhelper-test.exe" } else { "lhelper.exe" }
 
 $kit = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter makeappx.exe -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | Select-Object -First 1
@@ -19,7 +26,7 @@ $cargo = Get-Content (Join-Path $PSScriptRoot "..\Cargo.toml") -Raw
 if ($cargo -notmatch '(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"') { throw "No version in Cargo.toml" }
 $version = "$($Matches[1]).$($Matches[2]).$($Matches[3]).0"
 
-$build = Join-Path $PSScriptRoot "build"
+$build = Join-Path $PSScriptRoot $(if ($Test) { "build-test" } else { "build" })
 $msix = Join-Path $build "LHelper.msix"
 $cer = Join-Path $build "LHelper.cer"
 New-Item -ItemType Directory -Force $build | Out-Null
@@ -30,6 +37,16 @@ if (Test-Path $content) { Remove-Item $content -Recurse -Force }
 New-Item -ItemType Directory -Force (Join-Path $content "Assets"), (Join-Path $content "Public") | Out-Null
 $manifest = Get-Content (Join-Path $PSScriptRoot "AppxManifest.xml") -Raw
 $manifest = $manifest -replace '(<Identity[^>]*\sVersion=")[^"]*(")', "`${1}$version`${2}"
+function Swap([string]$From, [string]$To) {
+    if (-not $script:manifest.Contains($From)) { throw "AppxManifest.xml: '$From' not found" }
+    $script:manifest = $script:manifest.Replace($From, $To)
+}
+if ($Test) {
+    Swap 'Name="LHelper" Publisher="CN=LHelper"' "Name=""$package"" Publisher=""CN=$package"""
+    Swap 'Executable="lhelper.exe"' "Executable=""$exeName"""
+    Swap 'DisplayName="L-Helper"' "DisplayName=""$display"""
+    Swap '<DisplayName>L-Helper</DisplayName>' "<DisplayName>$display</DisplayName>"
+}
 Set-Content (Join-Path $content "AppxManifest.xml") $manifest -Encoding UTF8
 Copy-Item (Join-Path $PSScriptRoot "Assets\*.png") (Join-Path $content "Assets")
 Set-Content (Join-Path $content "Public\lighting.txt") "L-Helper drives 24-zone keyboard lighting as a Dynamic Lighting background controller."
@@ -44,9 +61,9 @@ if ($LASTEXITCODE -ne 0) { throw "makepri failed ($LASTEXITCODE)" }
 if ($LASTEXITCODE -ne 0) { throw "makeappx failed ($LASTEXITCODE)" }
 
 # Self-signed certificate, reused if it exists
-$cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -eq "CN=LHelper" -and $_.NotAfter -gt (Get-Date) } | Select-Object -First 1
+$cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -eq "CN=$package" -and $_.NotAfter -gt (Get-Date) } | Select-Object -First 1
 if (-not $cert) {
-    $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=LHelper" -FriendlyName "LHelper package signing" -KeyUsage DigitalSignature `
+    $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=$package" -FriendlyName "$package package signing" -KeyUsage DigitalSignature `
         -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(10) `
         -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
 }

@@ -4,3 +4,4 @@
 /packaging/install.log
 *.pfx
 /linux/target
+/packaging/build-test

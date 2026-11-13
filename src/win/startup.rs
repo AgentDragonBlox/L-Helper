@@ -13,7 +13,7 @@ use super::secure;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 fn task_name() -> String {
-    format!("LHelper_{}", std::env::var("USERNAME").unwrap_or_default())
+    format!("{}{}", crate::identity::TASK, std::env::var("USERNAME").unwrap_or_default())
 }
 
 fn schtasks(args: &[&str]) -> bool {
@@ -38,7 +38,7 @@ pub fn protected_exe() -> Option<PathBuf> {
     let dir = secure::install_dir();
     std::fs::create_dir_all(&dir).ok()?;
     secure::lock_down(&dir);
-    let target = dir.join("lhelper.exe");
+    let target = dir.join(crate::identity::EXE);
     let newer = |a: &PathBuf, b: &PathBuf| {
         let m = |p: &PathBuf| std::fs::metadata(p).and_then(|m| m.modified()).ok();
         m(a) > m(b)
@@ -118,7 +118,7 @@ pub fn unschedule_all() {
     let exe = PathBuf::from(std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into())).join("System32").join("schtasks.exe");
     let Ok(out) = Command::new(exe).args(["/Query", "/FO", "CSV", "/NH"]).creation_flags(CREATE_NO_WINDOW).output() else { return };
     let list = String::from_utf8_lossy(&out.stdout).to_string();
-    let mut names: Vec<&str> = list.lines().filter_map(|l| l.split(',').next()).map(|n| n.trim_matches('"')).filter(|n| n.starts_with("\\LHelper_")).collect();
+    let mut names: Vec<&str> = list.lines().filter_map(|l| l.split(',').next()).map(|n| n.trim_matches('"')).filter(|n| n.strip_prefix('\\').is_some_and(|n| n.starts_with(crate::identity::TASK))).collect();
     names.dedup();
     for name in names {
         let ok = schtasks(&["/Delete", "/TN", name, "/F"]);

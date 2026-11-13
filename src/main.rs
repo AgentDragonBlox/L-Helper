@@ -9,11 +9,13 @@ mod app;
 mod automation;
 mod config;
 mod gpu;
+mod identity;
 mod lenovo;
 mod lighting;
 mod logo;
 mod log;
 mod mode;
+mod native;
 mod nvapi;
 mod tray;
 mod ui;
@@ -21,13 +23,13 @@ mod updates;
 mod win;
 mod wmi;
 
-use windows::core::w;
+use windows::core::HSTRING;
 use windows::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS};
 use windows::Win32::Foundation::WAIT_OBJECT_0;
 use windows::Win32::System::Threading::{CreateEventW, CreateMutexW, OpenProcess, SetEvent, WaitForSingleObject, INFINITE, PROCESS_SYNCHRONIZE};
 
 /// Taskbar ID of the window and the Start menu shortcut (win/package.rs)
-pub const AUMID: &str = "LHelper.LHelper";
+pub const AUMID: &str = identity::AUMID;
 
 fn main() {
     // Before anything loads a DLL or touches settings (win/secure.rs)
@@ -42,7 +44,7 @@ fn main() {
     // Started by the Windows startup task: stay in the tray unless "Start minimized to tray" is off
     let start_hidden = autostart && config::is_not_false("start_minimized");
 
-    log!("------------ LHelper (Rust) {} {}", env!("CARGO_PKG_VERSION"), args[1..].join(" "));
+    log!("------------ {} (Rust) {} {}", identity::DISPLAY, env!("CARGO_PKG_VERSION"), args[1..].join(" "));
 
     // Run by the MSI installer: do the one step and exit, no UI
     if let Some(code) = win::package::installer_command(&args) {
@@ -60,10 +62,10 @@ fn main() {
                 let _ = windows::Win32::Foundation::CloseHandle(old);
             }
         }
-        let mutex = CreateMutexW(None, true, w!("Global\\LHelperRsApp"));
+        let mutex = CreateMutexW(None, true, &instance(""));
         if GetLastError() == ERROR_ALREADY_EXISTS && !screenshots {
-            let show = CreateEventW(None, false, false, w!("Global\\LHelperRsApp-Show"));
-            let ack = CreateEventW(None, false, false, w!("Global\\LHelperRsApp-Ack"));
+            let show = CreateEventW(None, false, false, &instance("-Show"));
+            let ack = CreateEventW(None, false, false, &instance("-Ack"));
             if let (Ok(show), Ok(ack)) = (show, ack) {
                 let _ = SetEvent(show);
                 if WaitForSingleObject(ack, 3000) == WAIT_OBJECT_0 {
@@ -79,6 +81,10 @@ fn main() {
 
     // First start after the MSI: register for Dynamic Lighting, then hand over to a copy with the package identity
     if !screenshots && win::package::register_after_install() {
+        return;
+    }
+    // The single exe started from Downloads: offer to install it, then hand over to the installed copy
+    if !screenshots && !autostart && win::package::offer_install() {
         return;
     }
 
@@ -112,8 +118,8 @@ fn main() {
         tray::start(toggle_window, || app::quit());
         // Re-show requests from second launches
         std::thread::spawn(|| unsafe {
-            let ack = CreateEventW(None, false, false, w!("Global\\LHelperRsApp-Ack"));
-            if let Ok(event) = CreateEventW(None, false, false, w!("Global\\LHelperRsApp-Show")) {
+            let ack = CreateEventW(None, false, false, &instance("-Ack"));
+            if let Ok(event) = CreateEventW(None, false, false, &instance("-Show")) {
                 loop {
                     WaitForSingleObject(event, INFINITE);
                     win::show_near_tray(app::hwnd());
@@ -139,10 +145,18 @@ fn main() {
         log!("Taskbar: couldn't set the process ID: {}", e.message());
     }
 
+    // Classic Windows interface (src/native): `-native`, or Settings → "Classic Windows interface"; `-modern` overrides
+    let classic = args.iter().any(|a| a == "-native") || (config::get_string("ui_style").as_deref() == Some("native") && !args.iter().any(|a| a == "-modern"));
+    if classic {
+        native::run(&format!("{} — {}", identity::DISPLAY, lenovo::machine::get().model), start_hidden, screenshot_dir);
+        app::shutdown();
+        return;
+    }
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             // G-Helper style title bar: name and model, close button only (close hides to the tray)
-            .with_title(format!("L-Helper — {}", lenovo::machine::get().model))
+            .with_title(format!("{} — {}", identity::DISPLAY, lenovo::machine::get().model))
             .with_inner_size([ui::WIDTH, 700.0])
             .with_resizable(false)
             .with_maximize_button(false)
@@ -170,6 +184,11 @@ fn main() {
         log!("UI failed: {e}");
     }
     app::shutdown();
+}
+
+/// Single-instance mutex / event name for this copy (identity.rs)
+fn instance(suffix: &str) -> HSTRING {
+    HSTRING::from(format!("Global\\{}{suffix}", identity::INSTANCE))
 }
 
 /// Tray left click: show next to the tray, or hide

@@ -1,5 +1,7 @@
 //! Performance modes: GameZone firmware modes on gaming models, ITS modes on IdeaPads, plus Custom limits / fan curve
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::config;
 use crate::lenovo::gamezone::{self, Cap};
 use crate::lenovo::its::{self, ItsMode};
@@ -131,8 +133,13 @@ pub fn get() -> Option<Mode> {
     match gamezone::smart_fan_mode() {
         Ok(v) => Some(Mode::from_firmware(v)),
         Err(e) => {
-            crate::log!("Get mode failed: {e}");
-            None
+            // Asked every few seconds: log once. Some firmware takes the mode but can't report it (seen on an
+            // IdeaPad Slim 5 without ITS): show the last mode L-Helper set
+            static LOGGED: AtomicBool = AtomicBool::new(false);
+            if !LOGGED.swap(true, Ordering::Relaxed) {
+                crate::log!("Get mode failed: {e} (showing the last mode set instead)");
+            }
+            config::exists("performance_mode").then(|| Mode::from_index(config::get("performance_mode", 1))).flatten()
         }
     }
 }

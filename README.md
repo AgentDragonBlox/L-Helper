@@ -40,6 +40,8 @@ The certificate is what lets Dynamic Lighting hand the keyboard to L-Helper in t
 
 Settings and logs live in `C:\ProgramData\LHelper`. Only administrators can write to that folder, and uninstalling keeps it.
 
+**Single exe:** `L-Helper-<version>.exe` is the whole app in one file, with the Dynamic Lighting package built in. Run it, then accept the admin prompt and its offer to install. It copies itself to `C:\Program Files\LHelper`, adds a Start menu entry and registers with Dynamic Lighting. Uninstall it from **Settings → Apps** like the MSI. If you decline, it runs from where it is, without Dynamic Lighting background control.
+
 **Portable alternative:** `L-Helper-<version>.zip` has the same exe without an installer.
 1. Unzip the whole folder and run `lhelper.exe`.
 2. Open **Settings → Dynamic Lighting → Register**, then click **Restart**.
@@ -67,7 +69,8 @@ The output is `target\release\lhelper.exe`. The manifest asks for admin rights, 
 
 Packaging scripts need the Windows SDK. The release script also needs the .NET SDK, because it gets WiX 5 through `.config\dotnet-tools.json`.
 - `packaging\install.ps1` installs on this PC and registers the Dynamic Lighting package, for development. Run it as administrator.
-- `packaging\release.ps1` builds `dist\L-Helper-<version>.msi` and the portable `.zip` for a GitHub release. Bump `version` in `Cargo.toml` first. The installer source is `packaging\installer\LHelper.wxs`.
+- `packaging\release.ps1` builds `dist\L-Helper-<version>.exe` (single exe), `.msi` and the portable `.zip` for a GitHub release. Bump `version` in `Cargo.toml` first. The installer source is `packaging\installer\LHelper.wxs`.
+- `packaging\release.ps1 -Test` builds **L-Helper Test** (`L-Helper-Test-<version>.exe` and `.msi`). It has its own install folder, settings, Dynamic Lighting package, certificate (`CN=LHelperTest`), exe name and startup task, so it installs next to a regular L-Helper without touching it. The names are in `src\identity.rs`. Run only one copy at a time: both drive the same hardware.
 - `packaging\uninstall.ps1` removes everything that `install.ps1` added. Run it as administrator.
 
 The package is signed with a self-signed `CN=LHelper` certificate. It's kept in your CurrentUser certificate store. Back it up, and never commit the `.pfx` (see `packaging\pack.ps1`).

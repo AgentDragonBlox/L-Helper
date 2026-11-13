@@ -126,7 +126,7 @@ unsafe fn run(rx: Receiver<Cmd>, on_toggle: impl Fn() + Send + Sync + 'static, o
     let Ok(tray) = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_menu_on_left_click(false)
-        .with_tooltip("L-Helper")
+        .with_tooltip(crate::identity::DISPLAY)
         .with_icon(icon(shown).expect("icon"))
         .build()
     else {

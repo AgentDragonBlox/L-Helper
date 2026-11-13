@@ -291,7 +291,7 @@ pub fn section_header(ui: &mut Ui, theme: &Theme, icon: &str, title: &str, info:
         ui.label(RichText::new(icon).font(icons(17.0)).color(color));
         ui.label(RichText::new(title).font(bold(15.0)).color(theme.text));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(RichText::new(info).size(13.0).color(theme.text2));
+            ui.label(RichText::new(info).font(bold(13.0)).color(theme.text2));
         });
     });
 }

@@ -72,7 +72,7 @@ pub fn is_protected_location(path: &Path) -> bool {
 
 /// %ProgramFiles%\LHelper: the protected copy the startup task and the package point at
 pub fn install_dir() -> PathBuf {
-    PathBuf::from(std::env::var("ProgramW6432").or_else(|_| std::env::var("ProgramFiles")).unwrap_or_else(|_| "C:\\Program Files".into())).join("LHelper")
+    PathBuf::from(std::env::var("ProgramW6432").or_else(|_| std::env::var("ProgramFiles")).unwrap_or_else(|_| "C:\\Program Files".into())).join(crate::identity::FOLDER)
 }
 
 /// Download links from the update catalog may only go to Lenovo's download server

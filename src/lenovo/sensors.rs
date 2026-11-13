@@ -1,6 +1,7 @@
 //! Temperatures and fan speeds from LENOVO_OTHER_METHOD, battery rate from the battery class driver
 //! (IOCTL_BATTERY_QUERY_STATUS, as LLT does) with root\WMI BatteryStatus as fallback
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use super::gamezone::{self, Cap};
@@ -75,7 +76,8 @@ pub fn read() -> Reading {
     r.battery_rate = battery_rate().or_else(wmi_battery_rate);
     r.cpu_power = cpu_power();
     match nvidia_awake() {
-        Some(true) => r.gpu_power = gpu_power(),
+        Some(true) if DETAILED.load(Ordering::SeqCst) => r.gpu_power = gpu_power(),
+        Some(true) => {}
         Some(false) => r.gpu_asleep = true,
         None => {}
     }
@@ -164,6 +166,18 @@ fn nvidia_awake() -> Option<bool> {
 }
 
 static NVML: Mutex<Option<nvml_wrapper::Nvml>> = Mutex::new(None);
+/// GPU power from NVML in read(): only while the window shows it (app.rs), so NVML can stay unloaded in the tray
+static DETAILED: AtomicBool = AtomicBool::new(true);
+
+/// While false, read() skips NVML (GPU power) and NVML is unloaded: nvml.dll and its allocations are ~20 MB
+pub fn set_detailed(on: bool) {
+    if !DETAILED.swap(on, Ordering::SeqCst) || on {
+        return;
+    }
+    if NVML.lock().unwrap().take().is_some() {
+        crate::log!("NVML unloaded (window hidden)");
+    }
+}
 
 /// NVIDIA GPU load (%) and VRAM used / total (bytes), for the overlay. None while the GPU sleeps (asking would wake it).
 pub fn nvidia_usage() -> Option<(u32, u64, u64)> {
